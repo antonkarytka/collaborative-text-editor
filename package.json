@@ -1,0 +1,36 @@
+{
+  "name": "collaborative-text-editor",
+  "version": "1.0.0",
+  "description": "Realtime collaborative text editor.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node ./bin/www",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antnkrtk/collaborative-text-editor.git"
+  },
+  "keywords": [
+    "realtime",
+    "collaborative",
+    "editor"
+  ],
+  "author": "Anton Karytka",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/antnkrtk/collaborative-text-editor/issues"
+  },
+  "homepage": "https://github.com/antnkrtk/collaborative-text-editor#readme",
+  "dependencies": {
+    "body-parser": "~1.16.0",
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.6.0",
+    "express": "~4.14.1",
+    "morgan": "~1.7.0",
+    "pug": "~2.0.0-beta10",
+    "randomstring": "^1.1.5",
+    "serve-favicon": "~2.3.2",
+    "socketio": "^1.0.0"
+  }
+}

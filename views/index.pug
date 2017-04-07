@@ -1,0 +1,7 @@
+extends layout
+
+block content
+  h1='Enter document\'s name'
+  form#submitForm(method='POST' action=documentID)
+    input#name.form-control(type='text', placeholder='Document\'s name' name='name')
+    input#createDocument.form-control(type='submit', value='Create new document', name='createDocument')
