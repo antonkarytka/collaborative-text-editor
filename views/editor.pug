@@ -1,0 +1,24 @@
+doctype html
+html
+  head
+    title= title
+    meta(charset='utf-8')
+  body
+    textarea#editor(name='editor')
+        | #{value}
+    script(src='https://cdn.ckeditor.com/4.6.2/standard/ckeditor.js')
+    script.
+      let countChanges = 0;
+      let content = document.getElementById('editor').value;
+      document.getElementById('editor').value = '';
+      CKEDITOR.replace('editor');
+      CKEDITOR.instances['editor'].setData(content);
+      CKEDITOR.on('instanceReady', (event) => { event.editor.execCommand('maximize') });
+      CKEDITOR.on('key', (e) => {
+        countChanges += 1;
+        if (countChanges == 20) {
+          countChanges = 0;
+          localStorage.setItem('newest-version', e.editor.getData());
+          console.log(localStorage.getItem('newest-version'));
+        };
+      });
