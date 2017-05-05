@@ -1,12 +1,14 @@
 const express = require('express');
-const app = express();
-const server = require('http').Server(app);
 const path = require('path');
 const favicon = require('serve-favicon');
 const logger = require('morgan');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const MongoClient = require('mongodb').MongoClient;
+
+const app = express();
+const server = require('http').Server(app);
+const io = require('socket.io')(server);
 
 const index = require('./routes/index');
 const document = require('./routes/document');
@@ -48,10 +50,10 @@ MongoClient.connect('mongodb://localhost:27017/documents', (err, db) => {
     if (!err) {
         server.listen(8080, () => console.log('Server listening on 8080...'));
         app.locals.db = db;
+        app.locals.io = io;
     } else {
-        console.log('Unable to connect to the database');
+        console.log('Unable to connect to the database.');
     }
 });
-
 
 // module.exports = app;

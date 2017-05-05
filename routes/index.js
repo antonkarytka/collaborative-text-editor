@@ -6,8 +6,9 @@ router.get('/', async(req, res, next) => {
     const db = req.app.locals.db;
     let documentLink = randomstring.generate({ length: 7, charset: 'alphanumeric' });
     await db.listCollections().toArray((err, collections) => {
-        while (isDuplicate(documentLink, collections))
+        while (isDuplicate(documentLink, collections)) {
             documentLink = randomstring.generate({ length: 7, charset: 'alphanumeric' });
+        };
     });
 
     res.render('index', {
@@ -15,7 +16,6 @@ router.get('/', async(req, res, next) => {
         documentID: `/${documentLink}`
     });
 });
-
 
 function isDuplicate(documentLink, collections) {
     for (let collection of collections)

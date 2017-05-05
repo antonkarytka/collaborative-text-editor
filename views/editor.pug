@@ -6,19 +6,36 @@ html
   body
     textarea#editor(name='editor')
         | #{value}
+
+    script(src='http://localhost:8080/socket.io/socket.io.js')
     script(src='https://cdn.ckeditor.com/4.6.2/standard/ckeditor.js')
     script.
       let countChanges = 0;
       let content = document.getElementById('editor').value;
+      localStorage.setItem('old-version', content);
       document.getElementById('editor').value = '';
       CKEDITOR.replace('editor');
-      CKEDITOR.instances['editor'].setData(content);
-      CKEDITOR.on('instanceReady', (event) => { event.editor.execCommand('maximize') });
-      CKEDITOR.on('key', (e) => {
-        countChanges += 1;
-        if (countChanges == 20) {
-          countChanges = 0;
-          localStorage.setItem('newest-version', e.editor.getData());
-          console.log(localStorage.getItem('newest-version'));
-        };
+      CKEDITOR.on('instanceReady', e => {
+          e.editor.focus();
+          e.editor.setData(content);
+          e.editor.execCommand('maximize')
+      });
+
+      let documentId = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
+      let socket = io.connect(`/${documentId}`);
+      socket.on('apply updates', newContent => {
+          console.log('trying to apply updates!');
+          localStorage.setItem('old-version', newContent);
+          CKEDITOR.instances['editor'].setData(newContent);
+      });
+
+      CKEDITOR.instances['editor'].on('key', (e) => {
+          localStorage.setItem('new-version', e.editor.getData());
+          countChanges += 1;
+          if (countChanges == 20) {
+              socket.emit('send updated content to server', localStorage.getItem('new-version'));
+              countChanges = 0;
+              localStorage.setItem('old-version', localStorage.getItem('new-version'));
+              console.log(localStorage.getItem('new-version'));
+          };
       });
