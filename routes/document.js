@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const randomstring = require('randomstring');
+const diff = require('diff');
 
 router.get('/:id', async(req, res, next) => {
     const db = req.app.locals.db;
@@ -14,9 +15,10 @@ router.get('/:id', async(req, res, next) => {
         let content = document[0].content;
         res.render('editor', { title: name, value: content });
         documentNamespace.on('connection', socket => {
-            socket.on('send updated content to server', newContent => {
-                db.collection(documentId).update({ 'name' : name }, { $set: {'content': newContent} });
-                documentNamespace.emit('apply updates', newContent);
+            socket.on('send updated content to server', async(newContent) => {
+                await db.collection(documentId).update({ 'name' : name }, { $set: {'content': newContent} });
+                let differences = await diff.createPatch('', content, newContent, '', '');
+                documentNamespace.emit('apply updates', differences);
             })
         });
     } else {
