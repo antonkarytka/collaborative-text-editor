@@ -9,38 +9,70 @@ html
 
     script(src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.3/socket.io.min.js')
     script(src='https://cdnjs.cloudflare.com/ajax/libs/jsdiff/3.2.0/diff.min.js')
-    script(src='https://cdn.ckeditor.com/4.6.2/standard/ckeditor.js')
+    script(src='https://cloud.tinymce.com/stable/tinymce.min.js?apiKey=16uuw8w1blxejtydro9isjss58n3voupbpmqg9xb4hkme19g')
     script.
         let countChanges = 0;
         let content = document.getElementById('editor').value;
-        localStorage.setItem('old-version', content);
-        document.getElementById('editor').value = '';
-        CKEDITOR.replace('editor');
-        CKEDITOR.on('instanceReady', e => {
-            e.editor.focus();
-            e.editor.setData('', () => {
-                e.editor.insertHtml(content);
-            });
-            e.editor.execCommand('maximize')
-        });
-
-        let editor = CKEDITOR.instances['editor'];
+        localStorage.setItem('content', content);
         let documentId = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
         let socket = io.connect(`/${documentId}`);
-        socket.on('apply updates', differences => {
-            let newContent = localStorage.getItem('new-version');
-            JsDiff.applyPatch(newContent, differences);
-            editor.setData('', () => {
-                editor.insertHtml(newContent)
-            });
-            localStorage.setItem('old-version', newContent);
+
+        tinymce.init({
+            selector:'textarea',
+            // toolbar: ["fullscreen"],
+            plugins: ["fullscreen"],
+            width:'100%',
+            height:'100%',
+            setup: (editor) => {
+                editor.on('init', (e) => {
+                  editor.execCommand('mceFullScreen');
+                });
+                editor.on('keyup', (e) => {
+                    localStorage.setItem('content', tinymce.activeEditor.getContent());
+                    countChanges += 1;
+                    if (countChanges == 3) {
+                        socket.emit('send updated content to server', localStorage.getItem('content'));
+                        countChanges = 0;
+                    };
+                });
+            }
         });
 
-        editor.on('key', (e) => {
-          localStorage.setItem('new-version', e.editor.getData());
-          countChanges += 1;
-          if (countChanges == 20) {
-              socket.emit('send updated content to server', localStorage.getItem('new-version'));
-              countChanges = 0;
-          };
+        socket.on('apply updates', differences => {
+            let newContent = localStorage.getItem('content');
+            JsDiff.applyPatch(newContent, differences);
+            let index = getCursorPosition(tinymce.activeEditor);
+            tinymce.activeEditor.setContent(newContent);
+            setCursorPosition(tinymce.activeEditor, index);
+            localStorage.setItem('content', newContent);
         });
+
+        function getCursorPosition(editor) {
+            let bm = editor.selection.getBookmark(0);
+            let selector = "[data-mce-type=bookmark]";
+            let bmElements = editor.dom.select(selector);
+            editor.selection.select(bmElements[0]);
+            editor.selection.collapse();
+            let elementID = "cursor";
+            let positionString = '<span id="'+elementID+'"></span>';
+            editor.selection.setContent(positionString);
+            let content = editor.getContent({format: "html"});
+            let index = content.indexOf(positionString);
+            editor.dom.remove(elementID, false);
+            editor.selection.moveToBookmark(bm);
+
+            return index;
+        };
+
+        function setCursorPosition(editor, index) {
+            let content = editor.getContent({format: "html"});
+            let part1 = content.substr(0, index);
+            let part2 = content.substr(index);
+            let bookmark = editor.selection.getBookmark(0);
+            let positionString = '<span id="'+bookmark.id+'_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>';
+            let contentWithString = part1 + positionString + part2;
+            editor.setContent(contentWithString, ({format: "raw"}));
+            editor.selection.moveToBookmark(bookmark);
+
+            return bookmark;
+        };
