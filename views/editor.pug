@@ -3,6 +3,9 @@ html
   head
     title= title
     meta(charset='utf-8')
+    link(rel='stylesheet', href='/stylesheets/editor.css')
+    link(rel='stylesheet', href='/sweetalert2/dist/sweetalert2.min.css')
+    script(src='/sweetalert2/dist/sweetalert2.min.js')
   body
     textarea#editor(name='editor')
         | #{value}
@@ -18,15 +21,23 @@ html
         let socket = io.connect(`/${documentId}`);
 
         tinymce.init({
-            selector:'textarea',
-            // toolbar: ["fullscreen"],
-            plugins: ["fullscreen"],
-            width:'100%',
-            height:'100%',
+            selector: 'textarea',
+            plugins: ['fullscreen, lists'],
+            toolbar: 'undo redo | fontselect fontsizeselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | emoticons | editing-users',
+            statusbar: false,
             setup: (editor) => {
                 editor.on('init', (e) => {
                   editor.execCommand('mceFullScreen');
                 });
+
+                editor.addButton('editing-users', {
+                    image: '/images/editing-users.png',
+                    tooltip: 'Editing users',
+                    onclick: () => {
+                        socket.emit('ask for editing users list');
+                    }
+                });
+
                 editor.on('keyup', (e) => {
                     localStorage.setItem('content', tinymce.activeEditor.getContent());
                     countChanges += 1;
@@ -38,28 +49,35 @@ html
             }
         });
 
-        socket.on('apply updates', differences => {
-            let newContent = localStorage.getItem('content');
-            JsDiff.applyPatch(newContent, differences);
-            let index = getCursorPosition(tinymce.activeEditor);
-            tinymce.activeEditor.setContent(newContent);
-            setCursorPosition(tinymce.activeEditor, index);
-            localStorage.setItem('content', newContent);
+        socket.on('show editing users', users => {
+            let activeUsers = '';
+            users.map(user => { activeUsers += `${user}<br/>` });
+            swal(`Users working on "${document.title}"`, activeUsers, 'info');
         });
 
+        socket.on('apply updates to document', differences => {
+            let newestContent = localStorage.getItem('content');
+            JsDiff.applyPatch(newestContent, differences);
+            let index = getCursorPosition(tinymce.activeEditor);
+            tinymce.activeEditor.setContent(newestContent);
+            setCursorPosition(tinymce.activeEditor, index);
+            localStorage.setItem('content', newestContent);
+        });
+
+
         function getCursorPosition(editor) {
-            let bm = editor.selection.getBookmark(0);
+            let bookmark = editor.selection.getBookmark(0);
             let selector = "[data-mce-type=bookmark]";
-            let bmElements = editor.dom.select(selector);
-            editor.selection.select(bmElements[0]);
+            let bookmarkElements = editor.dom.select(selector);
+            editor.selection.select(bookmarkElements[0]);
             editor.selection.collapse();
             let elementID = "cursor";
-            let positionString = '<span id="'+elementID+'"></span>';
+            let positionString = '<span id="' + elementID + '"></span>';
             editor.selection.setContent(positionString);
             let content = editor.getContent({format: "html"});
             let index = content.indexOf(positionString);
             editor.dom.remove(elementID, false);
-            editor.selection.moveToBookmark(bm);
+            editor.selection.moveToBookmark(bookmark);
 
             return index;
         };
@@ -69,9 +87,9 @@ html
             let part1 = content.substr(0, index);
             let part2 = content.substr(index);
             let bookmark = editor.selection.getBookmark(0);
-            let positionString = '<span id="'+bookmark.id+'_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>';
+            let positionString = '<span id="' + bookmark.id + '_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>';
             let contentWithString = part1 + positionString + part2;
-            editor.setContent(contentWithString, ({format: "raw"}));
+            editor.setContent(contentWithString, ({ format: 'raw' }));
             editor.selection.moveToBookmark(bookmark);
 
             return bookmark;
