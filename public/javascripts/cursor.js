@@ -21,7 +21,7 @@ module.exports = {
         let part1 = content.substr(0, index);
         let part2 = content.substr(index);
         let bookmark = editor.selection.getBookmark(0);
-        let positionString = '<span id="' + bookmark.id + '_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>';
+        let positionString = `<span id="${bookmark.id}_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>`;
         let contentWithString = part1 + positionString + part2;
         editor.setContent(contentWithString, ({ format: 'raw' }));
         editor.selection.moveToBookmark(bookmark);

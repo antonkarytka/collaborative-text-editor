@@ -41,7 +41,7 @@ app.use((err, req, res, next) => {
     res.render('error');
 });
 
-MongoClient.connect('mongodb://localhost:27017/documents', (err, db) => {
+MongoClient.connect('mongodb://karytka:documents@ds147681.mlab.com:47681/documents', (err, db) => {
     if (!err) {
         server.listen(8080, () => console.log('Server listening on 8080...'));
         app.locals.db = db;

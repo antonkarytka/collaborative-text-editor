@@ -24,7 +24,6 @@
   "homepage": "https://github.com/antnkrtk/collaborative-text-editor#readme",
   "dependencies": {
     "body-parser": "~1.16.0",
-    "ckeditor": "^4.6.2",
     "cookie-parser": "~1.4.3",
     "debug": "~2.6.0",
     "diff": "^3.2.0",

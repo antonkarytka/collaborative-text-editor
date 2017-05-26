@@ -7,29 +7,35 @@ router.get('/:documentId', async(req, res, next) => {
     const io = req.app.locals.io;
 
     const documentId = req.params.documentId;
-    const documentNamespace = io.of(`/${documentId}`);
-    const documentsInDb = await db.listCollections().toArray();
-    if (documentExists(documentId, documentsInDb)) {
-        const document = await db.collection(documentId).find().toArray();
-        const name = document[0].name;
-        let content = document[0].content;
-        res.render('editor', { title: name, value: content });
+    const collectionsInDb = await db.listCollections().toArray();
+    if (documentExists(documentId, collectionsInDb)) {
+        const document = await db.collection(documentId).findOne();
+        const documentName = document.name;
+        let documentContent = document.content;
+        res.render('editor', { pageTitle: documentName, editorContent: documentContent });
 
-        documentNamespace.on('connection', socket => {
-            socket.on('change document\'s name', async(newName) => {
-                await db.collection(documentId).update({ 'name': name }, { $set: {'name': newName} });
+        io.once('connection', socket => {
+            socket.join(documentId);
+
+            socket.on('change document\'s name', async(newDocumentName) => {
+                await db.collection(documentId).update({}, { $set: {'name': newDocumentName} });
                 socket.emit('document\'s name changed');                
             });
 
             socket.on('ask for editing users list', async() => {
-                let users = await Object.keys(documentNamespace.sockets);
-                socket.emit('show editing users', users);
+                // NEED TO BECOME SOCKETS OF THE ROOM
+                let editingUsers = await Object.keys(io.sockets.sockets);
+                socket.emit('show editing users', editingUsers);
             });
 
-            socket.on('send updated content to server', async(newContent) => {
-                await db.collection(documentId).update({ 'name': name }, { $set: {'content': newContent} });
-                const differences = await diff.createPatch('', content, newContent, '', '');
-                documentNamespace.emit('apply updates to document', differences);
+            socket.on('send updated content to server', async(clientPatch) => {
+                io.to(documentId).emit('apply updates to document', clientPatch);
+                const document = await db.collection(documentId).findOne();
+                let documentContent = (document.content).toString();
+                documentContent = await diff.applyPatch(documentContent, clientPatch);
+                if (typeof(documentContent) == 'string') {
+                    await db.collection(documentId).update({}, { $set: {'content': documentContent} });
+                };
             });
         });
     } else {
@@ -47,9 +53,11 @@ router.post('/:documentId', async(req, res, next) => {
 });
 
 
-function documentExists(documentId, documentsInDatabase) {
-    for (let document of documentsInDatabase)
-        if (documentId == document.name)
+function documentExists(documentId, collectionsInDatabase) {
+    /* collection.name is document's id
+    (db.createCollection(documentId))*/
+    for (let collection of collectionsInDatabase)
+        if (documentId == collection.name)
             return true;
     return false;
 }

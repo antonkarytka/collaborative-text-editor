@@ -7,10 +7,12 @@ html
     link(rel='stylesheet', href='https://fonts.googleapis.com/css?family=Montserrat|Palanquin')
     link(rel='stylesheet', href='/sweetalert2/dist/sweetalert2.min.css')
     script(src='/sweetalert2/dist/sweetalert2.min.js')
+
   body
   #pageTitle Welcome to<br>collaborative text editor
   #pageSubtitle Enter document's name:
-  form#submitForm(method='POST' action=documentID onsubmit='return validateForm()')
+  //- On submit redirects to /newDocumentId. Id is generated in /routes/index.js
+  form#submitForm(method='POST' action=newDocumentId onsubmit='return validateForm()')
     input#documentName.form-control(type='text', placeholder='Document\'s name' name='documentName', autofocus)
     input#createDocumentBtn.form-control(type='submit', value='Create new document', name='createDocumentBtn')
 

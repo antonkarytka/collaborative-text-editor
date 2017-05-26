@@ -93,7 +93,7 @@ module.exports = {
         let part1 = content.substr(0, index);
         let part2 = content.substr(index);
         let bookmark = editor.selection.getBookmark(0);
-        let positionString = '<span id="' + bookmark.id + '_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>';
+        let positionString = `<span id="${bookmark.id}_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>`;
         let contentWithString = part1 + positionString + part2;
         editor.setContent(contentWithString, ({ format: 'raw' }));
         editor.selection.moveToBookmark(bookmark);
@@ -108,8 +108,24 @@ module.exports = {
 
 const cursor = __webpack_require__(0);
 
-const documentId = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
-const socket = io.connect(`/${documentId}`);
+const socket = io.connect();
+
+socket.on('show editing users', users => {
+    let activeUsers = '';
+    users.map(user => { activeUsers += `${user}<br/>` });
+    swal(`Users working on "${document.title}"`, activeUsers, 'info');
+});
+
+socket.on('apply updates to document', differences => {
+    let oldContent = localStorage.getItem('content');
+    let newestContent = JsDiff.applyPatch(oldContent, differences);
+    if (typeof(newestContent) == 'string') {
+        const index = cursor.getPosition(tinymce.activeEditor);
+        tinymce.activeEditor.setContent(newestContent);
+        cursor.setPosition(tinymce.activeEditor, index);
+        localStorage.setItem('content', newestContent);
+    };
+});
 
 tinymce.init({
     selector: 'textarea',
@@ -155,37 +171,25 @@ tinymce.init({
                     swal({
                         type: 'success',
                         title: 'Document\'s name has been changed!',
-                        html: 'New name: ' + documentsNewName
+                        html: `New name: ${documentsNewName}`
                     });
                 });
             }
         });
 
-        editor.on('keyup', (e) => {
-            localStorage.setItem('content', tinymce.activeEditor.getContent());
+        editor.on('keyup', async(e) => {
             countChanges += 1;
-            if (countChanges == 3) {
-                socket.emit('send updated content to server', localStorage.getItem('content'));
+            if (countChanges > 3) {
+                let oldContent = localStorage.getItem('content');
+                let newestContent = tinymce.activeEditor.getContent();
+                const patch = JsDiff.createPatch('', oldContent, newestContent, '', '');
+                socket.emit('send updated content to server', patch);
                 countChanges = 0;
             };
         });
     }
 });
 
-socket.on('show editing users', users => {
-    let activeUsers = '';
-    users.map(user => { activeUsers += `${user}<br/>` });
-    swal(`Users working on "${document.title}"`, activeUsers, 'info');
-});
-
-socket.on('apply updates to document', differences => {
-    let newestContent = localStorage.getItem('content');
-    JsDiff.applyPatch(newestContent, differences);
-    const index = cursor.getPosition(tinymce.activeEditor);
-    tinymce.activeEditor.setContent(newestContent);
-    cursor.setPosition(tinymce.activeEditor, index);
-    localStorage.setItem('content', newestContent);
-});
 
 /***/ })
 /******/ ]);

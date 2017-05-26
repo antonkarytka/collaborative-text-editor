@@ -4,23 +4,26 @@ const randomstring = require('randomstring');
 
 router.get('/', async(req, res, next) => {
     const db = req.app.locals.db;
-    let documentLink = randomstring.generate({ length: 7, charset: 'alphanumeric' });
+    let documentId = randomstring.generate({ length: 7, charset: 'alphanumeric', capitalization: 'lowercase' });
     await db.listCollections().toArray((err, collections) => {
-        while (isDuplicate(documentLink, collections)) {
-            documentLink = randomstring.generate({ length: 7, charset: 'alphanumeric' });
+        while (isDuplicate(documentId, collections)) {
+            documentId = randomstring.generate({ length: 7, charset: 'alphanumeric', capitalization: 'lowercase' });
         };
     });
 
     res.render('index', {
         title: 'Collaborative text editor',
-        documentID: `/${documentLink}`
+        newDocumentId: `/${documentId}`
     });
 });
 
-function isDuplicate(documentLink, collections) {
-    for (let collection of collections)
-        if (documentLink == collection.name)
+function isDuplicate(documentId, collections) {
+    /* collection.name is document's id
+    (db.createCollection(documentId))*/
+    for (let collection of collections) {
+        if (documentId == collection.name)
             return true;
+    }
     return false;
 }
 
