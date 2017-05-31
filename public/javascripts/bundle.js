@@ -70,45 +70,50 @@
 /* 0 */
 /***/ (function(module, exports) {
 
-module.exports = {
-    getPosition: (editor) => {
-        let bookmark = editor.selection.getBookmark(0);
-        let selector = "[data-mce-type=bookmark]";
-        let bookmarkElements = editor.dom.select(selector);
-        editor.selection.select(bookmarkElements[0]);
-        editor.selection.collapse();
-        let elementID = "cursor";
-        let positionString = '<span id="' + elementID + '"></span>';
-        editor.selection.setContent(positionString);
-        let content = editor.getContent({format: "html"});
-        let index = content.indexOf(positionString);
-        editor.dom.remove(elementID, false);
-        editor.selection.moveToBookmark(bookmark);
+const dpm = new diff_match_patch();
 
-        return index;
-    },
+class Client {
+    constructor(socket) {
+        this.socket = socket;
+    }
 
-    setPosition: (editor, index) => {
-        let content = editor.getContent({format: "html"});
-        let part1 = content.substr(0, index);
-        let part2 = content.substr(index);
-        let bookmark = editor.selection.getBookmark(0);
-        let positionString = `<span id="${bookmark.id}_start" data-mce-type="bookmark" data-mce-style="overflow:hidden;line-height:0px"></span>`;
-        let contentWithString = part1 + positionString + part2;
-        editor.setContent(contentWithString, ({ format: 'raw' }));
-        editor.selection.moveToBookmark(bookmark);
+    sendDiffToServer() {
+        const oldContent = localStorage.getItem('old-content');
+        const newestContent = localStorage.getItem('newest-content'); 
 
-        return bookmark;
+        if (oldContent != newestContent) {
+            const patch = dpm.patch_make(oldContent, newestContent);
+            this.socket.emit('send updated content to server', patch); 
+            localStorage.setItem('old-content', newestContent);        
+        };
     }
 }
+
+module.exports = Client;
 
 /***/ }),
 /* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
-const cursor = __webpack_require__(0);
+const Client = __webpack_require__(0);
 
 const socket = io.connect();
+const client = new Client(socket);
+const dpm = new diff_match_patch();
+
+setInterval(() => {
+    client.sendDiffToServer();
+}, 300);
+
+socket.on('apply updates to document', differences => {
+    const oldContent = localStorage.getItem('newest-content');
+    const newestContent = dpm.patch_apply(differences, oldContent)[0];
+    const bookmark = tinymce.activeEditor.selection.getBookmark(2, true);
+    tinymce.activeEditor.setContent(newestContent);
+    tinymce.activeEditor.selection.moveToBookmark(bookmark);
+    localStorage.setItem('old-content', newestContent);
+    localStorage.setItem('newest-content', newestContent);
+});
 
 socket.on('show editing users', users => {
     let activeUsers = '';
@@ -116,29 +121,20 @@ socket.on('show editing users', users => {
     swal(`Users working on "${document.title}"`, activeUsers, 'info');
 });
 
-socket.on('apply updates to document', differences => {
-    let oldContent = localStorage.getItem('content');
-    let newestContent = JsDiff.applyPatch(oldContent, differences);
-    if (typeof(newestContent) == 'string') {
-        const index = cursor.getPosition(tinymce.activeEditor);
-        tinymce.activeEditor.setContent(newestContent);
-        cursor.setPosition(tinymce.activeEditor, index);
-        localStorage.setItem('content', newestContent);
-    };
-});
-
 tinymce.init({
     selector: 'textarea',
     plugins: ['fullscreen, lists'],
     toolbar: 'undo redo | fontselect fontsizeselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | emoticons | editingusers documenttitle',
     statusbar: false,
-    setup: (editor) => {
-        let countChanges = 0;
-        
-        editor.on('init', (e) => {
-            const content = document.getElementById('editor').value;
-            localStorage.setItem('content', content);
+    setup: editor => {
+        let editorInitialized = false;
 
+        editor.on('init', e => {
+            editorInitialized = true;
+            this.editor = tinymce.get('editor');                   
+            const content = document.getElementById('editor').value;
+            localStorage.setItem('old-content', content);
+            localStorage.setItem('newest-content', content);
             editor.execCommand('mceFullScreen');
         });
 
@@ -177,15 +173,14 @@ tinymce.init({
             }
         });
 
-        editor.on('keyup', async(e) => {
-            countChanges += 1;
-            if (countChanges > 3) {
-                let oldContent = localStorage.getItem('content');
-                let newestContent = tinymce.activeEditor.getContent();
-                const patch = JsDiff.createPatch('', oldContent, newestContent, '', '');
-                socket.emit('send updated content to server', patch);
-                countChanges = 0;
-            };
+        editor.on('change', () => {
+            if (editorInitialized)
+                localStorage.setItem('newest-content', tinymce.activeEditor.getContent());
+        });
+
+        editor.on('keyup', () => {
+            if (editorInitialized)
+                localStorage.setItem('newest-content', tinymce.activeEditor.getContent());
         });
     }
 });

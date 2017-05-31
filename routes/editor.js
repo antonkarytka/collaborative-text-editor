@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const diff = require('diff');
+const DiffMatchPatch = require('diff-match-patch');
+const dpm = new DiffMatchPatch();
 
 router.get('/:documentId', async(req, res, next) => {
     const db = req.app.locals.db;
@@ -16,26 +17,25 @@ router.get('/:documentId', async(req, res, next) => {
 
         io.once('connection', socket => {
             socket.join(documentId);
-
+            
             socket.on('change document\'s name', async(newDocumentName) => {
                 await db.collection(documentId).update({}, { $set: {'name': newDocumentName} });
                 socket.emit('document\'s name changed');                
             });
 
-            socket.on('ask for editing users list', async() => {
-                // NEED TO BECOME SOCKETS OF THE ROOM
-                let editingUsers = await Object.keys(io.sockets.sockets);
+            socket.on('ask for editing users list', () => {
+                let editingUsers = Object.keys(io.sockets.adapter.rooms[documentId].sockets);
                 socket.emit('show editing users', editingUsers);
             });
 
+            // ЕСЛИ ДОБАВИТЬ ТЕКСТ ДО КАРЕТКИ, ОНА СДВИГАЕТСЯ
+
             socket.on('send updated content to server', async(clientPatch) => {
-                io.to(documentId).emit('apply updates to document', clientPatch);
+                socket.broadcast.to(documentId).emit('apply updates to document', clientPatch);
                 const document = await db.collection(documentId).findOne();
-                let documentContent = (document.content).toString();
-                documentContent = await diff.applyPatch(documentContent, clientPatch);
-                if (typeof(documentContent) == 'string') {
-                    await db.collection(documentId).update({}, { $set: {'content': documentContent} });
-                };
+                let documentContent = document.content.toString();
+                documentContent = dpm.patch_apply(clientPatch, documentContent)[0];
+                await db.collection(documentId).update({}, { $set: {'content': documentContent} });
             });
         });
     } else {
