@@ -1,21 +1,24 @@
 const Client = require('./client');
 
+const documentId = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
+
 const socket = io.connect(); // <-- From CDN
-const client = new Client(socket);
+const client = new Client(socket, documentId);
 const dpm = new diff_match_patch(); // <-- From CDN
+
 
 setInterval(() => {
     client.sendDiffToServer();
 }, 300);
 
 socket.on('apply updates to document', differences => {
-    const oldContent = localStorage.getItem('newest-content');
+    const oldContent = localStorage.getItem(`newest-content-${documentId}`);
     const newestContent = dpm.patch_apply(differences, oldContent)[0];
     const bookmark = tinymce.activeEditor.selection.getBookmark(2, true);
     tinymce.activeEditor.setContent(newestContent);
     tinymce.activeEditor.selection.moveToBookmark(bookmark);
-    localStorage.setItem('old-content', newestContent);
-    localStorage.setItem('newest-content', newestContent);
+    localStorage.setItem(`old-content-${documentId}`, newestContent);
+    localStorage.setItem(`newest-content-${documentId}`, newestContent);
 });
 
 socket.on('show editing users', users => {
@@ -36,8 +39,8 @@ tinymce.init({
             editorInitialized = true;
             this.editor = tinymce.get('editor');                   
             const content = document.getElementById('editor').value;
-            localStorage.setItem('old-content', content);
-            localStorage.setItem('newest-content', content);
+            localStorage.setItem(`old-content-${documentId}`, content);
+            localStorage.setItem(`newest-content-${documentId}`, content);
             editor.execCommand('mceFullScreen');
         });
 
@@ -112,12 +115,12 @@ tinymce.init({
 
         editor.on('change', () => {
             if (editorInitialized)
-                localStorage.setItem('newest-content', tinymce.activeEditor.getContent());
+                localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
         });
 
         editor.on('keyup', () => {
             if (editorInitialized)
-                localStorage.setItem('newest-content', tinymce.activeEditor.getContent());
+                localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
         });
     }
 });
