@@ -21,6 +21,7 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'node_modules')));
 
@@ -41,14 +42,23 @@ app.use((err, req, res, next) => {
     res.render('error');
 });
 
-MongoClient.connect('mongodb://karytka:documents@ds147681.mlab.com:47681/documents', (err, db) => {
+MongoClient.connect('mongodb://<user>:<password>@ds147681.mlab.com:47681/documents', (err, db) => {
     if (!err) {
         server.listen(8080, () => console.log('Server listening on 8080...'));
-        app.locals.db = db;
+        app.locals.dbDocs = db;
         app.locals.io = io;
     } else {
-        console.log('Unable to connect to the database.');
+        console.log('Unable to connect to "documents" database.');
     };
 });
+
+MongoClient.connect('mongodb://<user>:<password>@ds119210.mlab.com:19210/anonymous_nicknames', (err, db) => {
+    if (!err) {
+        app.locals.dbNicknames = db;
+    } else {
+        console.log('Unable to connect to "nicknames" database.');
+    };
+});
+
 
 module.exports = app;

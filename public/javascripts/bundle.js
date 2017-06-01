@@ -97,9 +97,9 @@ module.exports = Client;
 
 const Client = __webpack_require__(0);
 
-const socket = io.connect();
+const socket = io.connect(); // <-- From CDN
 const client = new Client(socket);
-const dpm = new diff_match_patch();
+const dpm = new diff_match_patch(); // <-- From CDN
 
 setInterval(() => {
     client.sendDiffToServer();
@@ -118,13 +118,13 @@ socket.on('apply updates to document', differences => {
 socket.on('show editing users', users => {
     let activeUsers = '';
     users.map(user => { activeUsers += `${user}<br/>` });
-    swal(`Users working on "${document.title}"`, activeUsers, 'info');
+    swal(`Users working on "${document.title}"`, activeUsers, 'info').catch(swal.noop);
 });
 
 tinymce.init({
     selector: 'textarea',
     plugins: ['fullscreen, lists'],
-    toolbar: 'undo redo | fontselect fontsizeselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | emoticons | editingusers documenttitle',
+    toolbar: 'undo redo | fontselect fontsizeselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | emoticons | editingusers username documenttitle',
     statusbar: false,
     setup: editor => {
         let editorInitialized = false;
@@ -146,6 +146,40 @@ tinymce.init({
             }
         });
 
+        editor.addButton('username', {
+            text: 'Your name',
+            tooltip: 'Change your name',
+            onclick: async() => {
+                const clientsNewName = await swal({
+                    title: 'Enter your new name',
+                    input: 'text',
+                    showCancelButton: true,
+                    confirmButtonText: 'Change',
+                    showLoaderOnConfirm: true,
+                    preConfirm: async(newName) => {
+                        await socket.emit('change client\'s name', newName);
+                    },
+                    allowOutsideClick: true
+                }).catch(swal.noop);
+
+                socket.on('client\'s name changed', () => {
+                    swal({
+                        type: 'success',
+                        title: 'Client\'s name has been changed!',
+                        html: `New name: ${clientsNewName}`
+                    });
+                });
+
+                socket.on('error changing client\'s name', () => {
+                    swal({
+                        type: 'error',
+                        title: 'Name already in use',
+                        html: `Client with the name "${clientsNewName}" is editing the document!`
+                    });
+                });
+            }
+        });
+
         editor.addButton('documenttitle', {
             text: 'Document\'s name',
             tooltip: 'Edit document\'s name',
@@ -160,7 +194,7 @@ tinymce.init({
                         await socket.emit('change document\'s name', newName);
                     },
                     allowOutsideClick: true
-                });
+                }).catch(swal.noop);
 
                 socket.on('document\'s name changed', () => {
                     document.title = documentsNewName;
