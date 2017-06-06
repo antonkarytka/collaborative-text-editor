@@ -100,14 +100,22 @@ const Client = __webpack_require__(0);
 
 const documentId = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
 
-const socket = io.connect(); // <-- From CDN
+let socket = io.connect(); // <-- From CDN
 const client = new Client(socket, documentId);
 const dpm = new diff_match_patch(); // <-- From CDN
 
+let socketConnected = false;
 
 setInterval(() => {
-    client.sendDiffToServer();
+    if (socketConnected) {
+        client.sendDiffToServer();
+    };
 }, 300);
+
+socket.on('connect', () => { socketConnected = true });
+socket.io.engine.on('heartbeat', () => { socketConnected = true });
+socket.on('disconnect', () => { socketConnected = false });
+
 
 socket.on('apply updates to document', differences => {
     const oldContent = localStorage.getItem(`newest-content-${documentId}`);
@@ -131,15 +139,21 @@ tinymce.init({
     toolbar: 'undo redo | fontselect fontsizeselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | emoticons | editingusers username documenttitle',
     statusbar: false,
     setup: editor => {
-        let editorInitialized = false;
 
         editor.on('init', e => {
-            editorInitialized = true;
             this.editor = tinymce.get('editor');                   
             const content = document.getElementById('editor').value;
             localStorage.setItem(`old-content-${documentId}`, content);
             localStorage.setItem(`newest-content-${documentId}`, content);
             editor.execCommand('mceFullScreen');
+
+            editor.on('change', async() => {
+                await localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
+            });
+
+            editor.on('keyup', async() => {
+                await localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
+            });
         });
 
         editor.addButton('editingusers', {
@@ -209,16 +223,6 @@ tinymce.init({
                     });
                 });
             }
-        });
-
-        editor.on('change', () => {
-            if (editorInitialized)
-                localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
-        });
-
-        editor.on('keyup', () => {
-            if (editorInitialized)
-                localStorage.setItem(`newest-content-${documentId}`, tinymce.activeEditor.getContent());
         });
     }
 });

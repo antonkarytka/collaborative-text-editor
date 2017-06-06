@@ -3,9 +3,9 @@ const router = express.Router();
 const randomstring = require('randomstring');
 
 router.get('/', async(req, res, next) => {
-    const db = req.app.locals.db;
+    const dbDocs = req.app.locals.dbDocs;
     let documentId = randomstring.generate({ length: 7, charset: 'alphanumeric', capitalization: 'lowercase' });
-    await db.listCollections().toArray((err, collections) => {
+    await dbDocs.listCollections().toArray((err, collections) => {
         while (isDuplicate(documentId, collections)) {
             documentId = randomstring.generate({ length: 7, charset: 'alphanumeric', capitalization: 'lowercase' });
         };
